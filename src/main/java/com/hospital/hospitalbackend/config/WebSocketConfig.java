@@ -19,6 +19,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // The endpoint the frontend will use to connect to the WebSocket server.
-        registry.addEndpoint("/ws-hospital").setAllowedOrigins("*").withSockJS();
+        registry.addEndpoint("/ws-hospital").setAllowedOriginPatterns("*").withSockJS();
     }
 }
