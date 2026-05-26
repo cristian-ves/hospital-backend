@@ -90,4 +90,12 @@ public class ResourceManager {
     public void broadcastCurrentState() {
         notificationService.sendUpdate("resource-status", getResourceState());
     }
+
+    public Semaphore getOperatingRooms() {
+        return operatingRooms;
+    }
+
+    public Semaphore getMonitors() {
+        return monitors;
+    }
 }
