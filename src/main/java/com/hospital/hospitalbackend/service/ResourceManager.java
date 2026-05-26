@@ -86,4 +86,8 @@ public class ResourceManager {
                 emergencyRooms.availablePermits()
         );
     }
+
+    public void broadcastCurrentState() {
+        notificationService.sendUpdate("resource-status", getResourceState());
+    }
 }

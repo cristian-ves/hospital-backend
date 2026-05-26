@@ -3,12 +3,11 @@ package com.hospital.hospitalbackend.service;
 import com.hospital.hospitalbackend.dto.PatientStatusDTO;
 import com.hospital.hospitalbackend.model.LogEntry;
 import com.hospital.hospitalbackend.model.Patient;
+import com.hospital.hospitalbackend.model.TriageLevel;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,7 +57,7 @@ public class SimulationService {
         long admittedAt = System.currentTimeMillis();
         PatientStatusDTO status = new PatientStatusDTO(
                 patient.getId().toString(), patient.getName(),
-                patient.getTriageLevel().name(), "QUEUED", admittedAt
+                patient.getTriageLevel().name(), "QUEUED", admittedAt, 0L
         );
         activePatients.put(patient.getId().toString(), status);
         notificationService.sendPatientUpdate(activePatients.values());
@@ -69,7 +68,7 @@ public class SimulationService {
     }
 
     private void runPatientProcess(Patient patient) {
-        long queuedAt = activePatients.get(patient.getId()).admittedAt();
+        long queuedAt = activePatients.get(patient.getId().toString()).admittedAt();
         try {
             notificationService.sendLog(LogEntry.wait(
                     "[WAIT] " + patient.getName() + " waiting for resources..."
@@ -77,26 +76,27 @@ public class SimulationService {
             // Blocks here until semaphores are available
             resourceManager.acquireResources(patient.getTriageLevel());
 
+            long startedAt = System.currentTimeMillis();
             long waitMs = System.currentTimeMillis() - queuedAt;
             waitTimes.add(waitMs);
 
             activePatients.put(patient.getId().toString(), new PatientStatusDTO(
                     patient.getId().toString(), patient.getName(),
-                    patient.getTriageLevel().name(), "IN_PROGRESS", queuedAt
+                    patient.getTriageLevel().name(), "IN_PROGRESS", queuedAt, startedAt
             ));
             notificationService.sendPatientUpdate(activePatients.values());
             notificationService.sendLog(LogEntry.info(
                     "[START] " + patient.getName() + " — resources acquired (waited " + waitMs/1000 + "s)"
             ));
 
-            Thread.sleep(10_000);
+            Thread.sleep(60_000);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
             resourceManager.releaseResources(patient.getTriageLevel());
             totalAttended.incrementAndGet();
-            activePatients.remove(patient.getId());
+            activePatients.remove(patient.getId().toString());
             notificationService.sendPatientUpdate(activePatients.values());
             notificationService.sendLog(LogEntry.system(
                     "[DONE] " + patient.getName() + " — treatment complete"
@@ -112,5 +112,33 @@ public class SimulationService {
                 "totalAttended", totalAttended.get(),
                 "avgWaitSeconds", Math.round(avgWait * 10.0) / 10.0
         ));
+    }
+
+    /** Called when a new WebSocket client subscribes — replays current state to catch them up. */
+    public void broadcastCurrentState() {
+        notificationService.sendPatientUpdate(activePatients.values());
+        resourceManager.broadcastCurrentState();
+        broadcastStats();
+    }
+
+    /** Seeds demo patients so the queue is never empty on a fresh start. */
+    @jakarta.annotation.PostConstruct
+    public void seedDemoPatients() {
+        new Thread(() -> {
+            try {
+                // Small delay so the WS broker is fully initialized before we broadcast.
+                Thread.sleep(1500);
+                List.of(
+                        Patient.builder().id(UUID.randomUUID()).name("Dave Mustaine")
+                                .triageLevel(TriageLevel.CRITICAL).arrivalTime(LocalDateTime.now()).build(),
+                        Patient.builder().id(UUID.randomUUID()).name("James Hetfield")
+                                .triageLevel(TriageLevel.EMERGENCY).arrivalTime(LocalDateTime.now()).build(),
+                        Patient.builder().id(UUID.randomUUID()).name("Kirk Hammett")
+                                .triageLevel(TriageLevel.URGENT).arrivalTime(LocalDateTime.now()).build()
+                ).forEach(this::processPatient);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
     }
 }

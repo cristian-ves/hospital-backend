@@ -1,11 +1,8 @@
 package com.hospital.hospitalbackend.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Getter;
 
-/**
- * Defines the triage priority levels for emergency patients.
- * Priorities are ranked 1 (Critical) to 5 (Non-Urgent).
- */
 @Getter
 public enum TriageLevel {
     CRITICAL(1, "Immediate attention"),
@@ -20,5 +17,13 @@ public enum TriageLevel {
     TriageLevel(int priority, String description) {
         this.priority = priority;
         this.description = description;
+    }
+
+    @JsonCreator
+    public static TriageLevel fromPriority(int value) {
+        for (TriageLevel level : values()) {
+            if (level.priority == value) return level;
+        }
+        throw new IllegalArgumentException("Unknown triage priority: " + value);
     }
 }
