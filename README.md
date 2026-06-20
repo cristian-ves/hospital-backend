@@ -70,7 +70,7 @@ When resources are unavailable, patients enter a priority-ordered waiting queue 
 
 ## Tech Stack
 
--   **Java 17** — core language
+-   **Java 21** — core language
 -   **Spring Boot** — application framework, REST controllers
 -   **Spring WebSocket (STOMP/SockJS)** — real-time bidirectional messaging
 -   **java.util.concurrent** — `Semaphore`, `PriorityBlockingQueue`, `ExecutorService`
